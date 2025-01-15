@@ -42,7 +42,7 @@ jobs:
       - name: 📦 Install dependencies
         run: bun install
       - name: 🏗️ Build packages
-        run: bun turbo build --filter=languine --filter=@languine/react-email
+        run: bun turbo build --filter=made2web --filter=@made2web/react-email
       - name: 🔖 Create and publish versions
         uses: changesets/action@master
         with:

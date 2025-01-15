@@ -11,8 +11,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Languine",
-  description: "Translate your application with Languine CLI powered by AI.",
+  title: "Made2Web Copilot",
+  description: "Made2Web Copilot",
 };
 
 export default async function RootLayout({

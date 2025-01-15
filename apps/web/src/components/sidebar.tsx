@@ -16,6 +16,7 @@ import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
 import {
   MdGraphicEq,
+  MdOutlineEdit,
   MdOutlineSettings,
   MdOutlineStackedBarChart,
 } from "react-icons/md";
@@ -35,6 +36,11 @@ export function Sidebar() {
       icon: MdGraphicEq,
       path: "/tuning",
       isActive: pathname.endsWith("/tuning"),
+    },
+    {
+      icon: MdOutlineEdit,
+      path: "/copywriting",
+      isActive: pathname.includes("/copywriting"),
     },
     {
       icon: MdOutlineSettings,

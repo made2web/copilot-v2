@@ -86,10 +86,10 @@ export default function WelcomeEmail({
               <Text className="text-sm leading-7 mb-6 font-mono text-[#707070]">
                 If you have any questions, feel free to reach out to us at{" "}
                 <Link
-                  href="mailto:support@languine.ai"
+                  href="mailto:support@made2web.com"
                   className="underline text-black font-mono"
                 >
-                  support@languine.ai
+                  support@made2web.com
                 </Link>
               </Text>
             </Section>

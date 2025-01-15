@@ -22,16 +22,19 @@ export const auth = betterAuth({
   }),
   secret: process.env.BETTER_AUTH_SECRET,
   baseURL: process.env.BETTER_AUTH_BASE_URL,
-  socialProviders: {
-    github: {
-      clientId: process.env.GITHUB_CLIENT_ID!,
-      clientSecret: process.env.GITHUB_CLIENT_SECRET!,
-    },
-    google: {
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    },
+  emailAndPassword: {
+    enabled: true,
   },
+  // socialProviders: {
+  //   github: {
+  //     clientId: process.env.GITHUB_CLIENT_ID!,
+  //     clientSecret: process.env.GITHUB_CLIENT_SECRET!,
+  //   },
+  //   google: {
+  //     clientId: process.env.GOOGLE_CLIENT_ID!,
+  //     clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+  //   },
+  // },
   secondaryStorage: {
     get: async (key: string) => {
       try {
@@ -111,9 +114,9 @@ export const auth = betterAuth({
         try {
           waitUntil(
             resend.emails.send({
-              from: "Languine <hello@emails.languine.ai>",
+              from: "Made2Web Copilot <hello@resend.made2web.dev>",
               to: data.email,
-              subject: `You've been invited to join ${data.organization.name} on Languine`,
+              subject: `You've been invited to join ${data.organization.name} on Made2Web Copilot`,
               react: InviteEmail({
                 invitedByUsername: data.inviter.user.name,
                 invitedByEmail: data.inviter.user.email,

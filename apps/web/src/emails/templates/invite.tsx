@@ -15,10 +15,10 @@ import {
 } from "@react-email/components";
 
 export default function InviteEmail({
-  invitedByUsername = "Viktor",
-  invitedByEmail = "viktor@languine.ai",
-  teamName = "Languine",
-  inviteLink = "https://languine.ai/invite",
+  invitedByUsername = "Ricardo Nascimento",
+  invitedByEmail = "ricardo@made2web.com",
+  teamName = "Made2Web",
+  inviteLink = "https://made2web.com/invite",
 }: {
   invitedByUsername: string;
   invitedByEmail: string;
@@ -66,10 +66,10 @@ export default function InviteEmail({
                 If you have any questions or didn't expect this invitation,
                 please contact{" "}
                 <Link
-                  href="mailto:support@languine.ai"
+                  href="mailto:support@made2web.com"
                   className="underline text-black font-mono"
                 >
-                  support@languine.ai
+                  support@made2web.com
                 </Link>
               </Text>
             </Section>

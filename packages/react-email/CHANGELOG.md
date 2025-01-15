@@ -1,4 +1,4 @@
-# @languine/react-email
+# @made2web/react-email
 
 ## 1.0.1
 

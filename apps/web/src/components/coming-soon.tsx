@@ -26,7 +26,7 @@ export function ComingSoon() {
             rel="noopener noreferrer"
             className="text-primary hover:underline"
           >
-            @languine_ai
+            @made2web
           </a>{" "}
           {t("coming_soon.cta")}
         </p>

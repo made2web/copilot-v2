@@ -9,7 +9,7 @@
 ---
 
 ```bash
-$ npm install @languine/react-email
+$ npm install @made2web/react-email
 ```
 
 ## What is this?
@@ -21,7 +21,7 @@ Language files are automatically included in the `locales` folder.
 ## How to use
 
 ```tsx
-import { setupI18n } from "@languine/react-email";
+import { setupI18n } from "@made2web/react-email";
 
 export function WelcomeEmail({ locale, name }) {
   const i18n = setupI18n(locale);

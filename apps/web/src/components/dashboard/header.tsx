@@ -2,7 +2,7 @@ import { ChangeLanguage } from "@/components/change-language";
 import { TeamSelectorServer } from "@/components/team-selector.server";
 import { UserMenu } from "@/components/user-menu";
 import Link from "next/link";
-import { MdOutlineBook } from "react-icons/md";
+import { IoNotificationsOutline } from "react-icons/io5";
 
 export function Header() {
   return (
@@ -13,14 +13,14 @@ export function Header() {
 
       <div className="flex justify-end items-center">
         <div className="flex pr-4 space-x-8 items-center">
-          <ChangeLanguage />
+          {/* <ChangeLanguage /> */}
 
-          <Link
-            href="/docs"
+          <button
+            type="button"
             className="[&>svg]:size-5 size-[70px] flex items-center justify-center border-l border-r border-border"
           >
-            <MdOutlineBook />
-          </Link>
+            <IoNotificationsOutline />
+          </button>
         </div>
 
         <UserMenu />
