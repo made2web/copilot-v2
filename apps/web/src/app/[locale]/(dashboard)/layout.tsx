@@ -2,7 +2,11 @@ import { ComingSoon } from "@/components/coming-soon";
 import { Header } from "@/components/dashboard/header";
 import { GlobalModals } from "@/components/modals";
 import { Sidebar } from "@/components/sidebar";
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import {
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
 import { Toaster } from "@/components/ui/sonner";
 import { getSession } from "@/lib/session";
 import { TRPCProvider } from "@/trpc/client";
@@ -31,6 +35,7 @@ export default async function Layout({
 
             <SidebarInset className="flex-1 bg-noise pb-8">
               <Header />
+              <SidebarTrigger />
 
               <main className="pt-4">
                 {children}

@@ -1,0 +1,52 @@
+ws_design_system
+- id: unique identifier
+- projectId: reference to Project
+- typography: JSON (font families, sizes, weights, line heights)
+- colors: JSON (custom color palette, if any, extending shadcn variables)
+- spacing: JSON (custom spacing scale)
+- borderRadius: JSON (custom border radius values, if different from shadcn)
+- shadows: JSON (custom shadow values)
+- breakpoints: JSON (custom breakpoint values, if any)
+- createdAt: datetime
+- updatedAt: datetime
+
+ws_initiative
+- id: unique identifier
+- name: string
+- projectId: reference to ws_project
+- createdAt: datetime
+- updatedAt: datetime
+
+ws_page
+- id: unique identifier
+- name: string
+- slug: string
+- initiativeId: reference to ws_initiative
+- createdAt: datetime
+- updatedAt: datetime
+
+ws_page_block
+- id: unique identifier
+- pageId: reference to ws_page
+- ws_blockId: reference to ws_block
+- order: integer
+- createdAt: datetime
+- updatedAt: datetime
+
+ws_blocks
+- id: unique identifier
+- projectId: reference to project
+- customizedContent: JSON
+- customizedDesignTokens: JSON (overrides for specific design tokens)
+- createdAt: datetime
+- updatedAt: datetime
+
+
+ws_block_template
+- id: unique identifier
+- name: string
+- type: string (e.g., "HeroImageRight", "Header", "Footer")
+- defaultContent: JSON
+- designTokens: JSON (specific design tokens this block uses)
+- createdAt: datetime
+- updatedAt: datetime

@@ -19,6 +19,7 @@ import {
   MdOutlineEdit,
   MdOutlineSettings,
   MdOutlineStackedBarChart,
+  MdOutlineWeb,
 } from "react-icons/md";
 import { Logo } from "./logo-square";
 
@@ -43,6 +44,11 @@ export function Sidebar() {
       isActive: pathname.includes("/copywriting"),
     },
     {
+      icon: MdOutlineWeb,
+      path: "/website",
+      isActive: pathname.includes("/website"),
+    },
+    {
       icon: MdOutlineSettings,
       path: "/settings",
       isActive: pathname.endsWith("/settings"),
@@ -52,7 +58,7 @@ export function Sidebar() {
   return (
     <div className="sticky top-0 h-screen">
       <SidebarBase
-        collapsible="none"
+        collapsible="offcanvas"
         className="border-r border-border bg-noise overflow-hidden"
       >
         <SidebarHeader className="flex justify-center items-center h-[70px] border-b">
