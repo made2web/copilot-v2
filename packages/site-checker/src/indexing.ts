@@ -17,6 +17,17 @@ interface BrandRankingResult {
   error?: string;
 }
 
+interface FaviconCheckResult {
+  isFaviconPresent: boolean;
+  faviconUrl?: string;
+  error?: string;
+}
+
+interface RobotsSitemapCheckResult {
+  mentionsSitemap: boolean;
+  error?: string;
+}
+
 /**
  * Verifica se um domínio está indexado no Google usando a API do Serper
  * @param domain - O domínio a ser verificado (ex: "example.com")
@@ -109,6 +120,84 @@ export async function checkBrandRanking(
           : "Erro desconhecido ao verificar ranking da marca",
     };
   }
+}
+
+/**
+ * Verifica se o favicon está presente no domínio
+ * @param domain - O domínio a ser verificado (ex: "example.com")
+ * @returns Promise<FaviconCheckResult> - Resultado da verificação
+ */
+export async function checkFavicon(domain: string): Promise<FaviconCheckResult> {
+  try {
+    const cleanDomain = cleanDomainName(domain);
+    const faviconUrl = `https://${cleanDomain}/favicon.ico`;
+
+    const response = await fetch(faviconUrl, { method: 'HEAD' });
+
+    return {
+      isFaviconPresent: response.ok,
+      faviconUrl: response.ok ? faviconUrl : undefined,
+    };
+  } catch (error) {
+    console.error("Erro ao verificar favicon:", error);
+    return {
+      isFaviconPresent: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Erro desconhecido ao verificar favicon",
+    };
+  }
+}
+
+/**
+ * Verifica se o arquivo robots.txt menciona o sitemap.xml do site
+ * @param domain - O domínio a ser verificado (ex: "example.com")
+ * @returns Promise<RobotsSitemapCheckResult> - Resultado da verificação
+ */
+export async function checkRobotsForSitemap(domain: string): Promise<RobotsSitemapCheckResult> {
+  try {
+    const cleanDomain = cleanDomainName(domain);
+    const robotsUrl = `https://${cleanDomain}/robots.txt`;
+
+    const response = await fetch(robotsUrl);
+    if (!response.ok) {
+      return {
+        mentionsSitemap: false,
+        error: `Failed to fetch robots.txt: ${response.status}`,
+      };
+    }
+
+    const robotsContent = await response.text();
+    const sitemapMentioned = robotsContent.includes("sitemap.xml");
+
+    return {
+      mentionsSitemap: sitemapMentioned,
+    };
+  } catch (error) {
+    console.error("Erro ao verificar robots.txt:", error);
+    return {
+      mentionsSitemap: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Erro desconhecido ao verificar robots.txt",
+    };
+  }
+}
+
+export async function getIndexedTestSubdomains(domain: string): Promise<string[]> {
+  const testSubdomains = ['test', 'staging', 'dev'];
+  const cleanDomain = cleanDomainName(domain);
+  const indexedSubdomains: string[] = [];
+  for (const sub of testSubdomains) {
+    const subdomain = `${sub}.${cleanDomain}`;
+    const result = await checkDomainIndexing(subdomain);
+    if (result.isIndexed) {
+      indexedSubdomains.push(subdomain);
+    }
+  }
+  return indexedSubdomains;
 }
 
 // Exemplo de uso:
