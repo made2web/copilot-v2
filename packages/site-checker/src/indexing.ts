@@ -1,210 +1,263 @@
-import { searchSerper } from "./libs/serper-dev/index.js";
-import type { SerperSearchResult } from "./libs/serper-dev/types.js";
-import { cleanDomainName } from "./utils.js";
+import { cleanDomainName, isURL } from "./utils.js";
 
-interface IndexCheckResult {
-  isIndexed: boolean;
-  totalResults: number;
-  error?: string;
+export interface Error404CheckResult {
+    exists: boolean;
+    error?: string;
 }
 
-interface BrandRankingResult {
-  isRankingFirst: boolean;
-  position?: number;
-  topResult?: {
-    link: string;
-  };
-  error?: string;
+interface ContentWordCountCheckResult {
+    hasLessThan200Words: boolean;
+    wordCount: number;
+    error?: string;
 }
 
-interface FaviconCheckResult {
-  isFaviconPresent: boolean;
-  faviconUrl?: string;
-  error?: string;
+export interface IndexationCheckResult {
+    isIndexed: boolean;
+    resultSummary: string;
+    error?: string;
 }
 
-interface RobotsSitemapCheckResult {
-  mentionsSitemap: boolean;
-  error?: string;
+export interface HomepageRankingCheckResult {
+    isRankedFirst: boolean;
+    resultSummary: string;
+    error?: string;
 }
 
-/**
- * Verifica se um domínio está indexado no Google usando a API do Serper
- * @param domain - O domínio a ser verificado (ex: "example.com")
- * @returns Promise<IndexCheckResult> - Resultado da verificação
- */
-export async function checkDomainIndexing(
-  domain: string,
-): Promise<IndexCheckResult> {
-  try {
-    // Limpa o domínio de protocolos e www se presentes
-    const cleanDomain = cleanDomainName(domain);
-
-    // Faz a busca usando o operador site: do Google
-    const searchQuery = `site:${cleanDomain}`;
-    const searchResult = await searchSerper({ q: searchQuery });
-
-    // Verifica se há resultados orgânicos
-    const hasResults =
-      Array.isArray(searchResult.organic) && searchResult.organic.length > 0;
-
-    return {
-      isIndexed: hasResults,
-      totalResults: searchResult.organic?.length || 0,
-    };
-  } catch (error) {
-    console.error("Erro ao verificar indexação:", error);
-    return {
-      isIndexed: false,
-      totalResults: 0,
-      error:
-        error instanceof Error
-          ? error.message
-          : "Erro desconhecido ao verificar indexação",
-    };
-  }
+export interface FaviconAppearanceCheckResult {
+    isFaviconPresent: boolean;
+    resultSummary: string;
+    error?: string;
 }
 
 /**
- * Verifica se o domínio está ranking em primeiro lugar para sua marca
- * @param domain - O domínio a ser verificado (ex: "example.com")
- * @param brand - O nome da marca a ser pesquisada
- * @returns Promise<BrandRankingResult> - Resultado da verificação
+ * Verifies if the homepage of the domain has less than 200 words of content
+ * @param input - HTML or domain to be checked (e.g., "example.com")
+ * @returns Promise<ContentWordCountCheckResult> - The result of the check
  */
-export async function checkBrandRanking(
-  domain: string,
-  brand: string,
-): Promise<BrandRankingResult> {
-  try {
-    // Limpa o domínio de protocolos e www se presentes
-    const cleanDomain = cleanDomainName(domain);
+export async function checkPageContentWordCount(input: string): Promise<ContentWordCountCheckResult> {
+    try {
+        let content: string;
+        
+        if (isURL(input)) {
+            const response = await fetch(input);
 
-    // Faz a busca pelo nome da marca
-    const searchResult = await searchSerper({ q: brand });
-
-    // Verifica se há resultados orgânicos
-    if (
-      !Array.isArray(searchResult.organic) ||
-      searchResult.organic.length === 0
-    ) {
-      return {
-        isRankingFirst: false,
-        error: "Nenhum resultado encontrado para a marca",
-      };
-    }
-
-    // Encontra a posição do site nos resultados (se existir)
-    const position =
-      searchResult.organic.findIndex(
-        (result: SerperSearchResult["organic"][0]) =>
-          cleanDomainName(result.link).startsWith(cleanDomain),
-      ) + 1; // +1 porque findIndex retorna índice baseado em 0
-
-    return {
-      isRankingFirst: position === 1,
-      position: position || undefined,
-      topResult:
-        position === 1
-          ? {
-              link: searchResult.organic[0].link,
+            if (!response.ok) {
+                return {
+                    hasLessThan200Words: false,
+                    wordCount: 0,
+                    error: "HTTP Error: " + response.status + " " + response.statusText
+                };
             }
-          : undefined,
-    };
-  } catch (error) {
-    console.error("Erro ao verificar ranking da marca:", error);
-    return {
-      isRankingFirst: false,
-      error:
-        error instanceof Error
-          ? error.message
-          : "Erro desconhecido ao verificar ranking da marca",
-    };
-  }
+            content = await response.text();
+        } else {
+            content = input;
+        }
+
+        const wordCount = content
+            .replace(/<[^>]+>/g, ' ')
+            .replace(/&#?[a-z0-9]+;/gi, ' ')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .split(/\s+/)
+            .filter(word => word.length > 0).length;
+
+        return {
+            hasLessThan200Words: wordCount < 200,
+            wordCount
+        };
+
+    } catch (error) {
+        return {
+            hasLessThan200Words: false,
+            wordCount: 0,
+            error: error instanceof Error ? error.message : "Erro desconhecido"
+        };
+    }
 }
 
 /**
- * Verifica se o favicon está presente no domínio
- * @param domain - O domínio a ser verificado (ex: "example.com")
- * @returns Promise<FaviconCheckResult> - Resultado da verificação
+ * Verifies if the homepage paragraphs are well divided, with a maximum of 3 lines per paragraph
+ * @param domain - The domain to be checked (e.g., "example.com")
+ * @returns Promise<Error404CheckResult> - The result of the check
  */
-export async function checkFavicon(domain: string): Promise<FaviconCheckResult> {
-  try {
-    const cleanDomain = cleanDomainName(domain);
-    const faviconUrl = `https://${cleanDomain}/favicon.ico`;
-
-    const response = await fetch(faviconUrl, { method: 'HEAD' });
-
-    return {
-      isFaviconPresent: response.ok,
-      faviconUrl: response.ok ? faviconUrl : undefined,
-    };
-  } catch (error) {
-    console.error("Erro ao verificar favicon:", error);
-    return {
-      isFaviconPresent: false,
-      error:
-        error instanceof Error
-          ? error.message
-          : "Erro desconhecido ao verificar favicon",
-    };
-  }
+export async function check404PageStatus(domain: string): Promise<Error404CheckResult> {
+    try {
+        const cleanDomain = cleanDomainName(domain);
+        const response = await fetch(`https://${cleanDomain}/404`);
+        return { exists: response.status === 404 };
+    } catch (error) {
+        return {
+            exists: false,
+            error: error instanceof Error ? error.message : "Unknown error while checking 404 page status",
+        };
+    }
 }
 
 /**
- * Verifica se o arquivo robots.txt menciona o sitemap.xml do site
- * @param domain - O domínio a ser verificado (ex: "example.com")
- * @returns Promise<RobotsSitemapCheckResult> - Resultado da verificação
+ * Checks if the site appears in Google's SERP by performing a search query using the "site:" operator.
+ * @param input - URL of the site to be checked (e.g., "https://example.com")
+ * @returns Promise<IndexationCheckResult> - The result indicating if the site is indexed.
  */
-export async function checkRobotsForSitemap(domain: string): Promise<RobotsSitemapCheckResult> {
-  try {
-    const cleanDomain = cleanDomainName(domain);
-    const robotsUrl = `https://${cleanDomain}/robots.txt`;
-
-    const response = await fetch(robotsUrl);
-    if (!response.ok) {
-      return {
-        mentionsSitemap: false,
-        error: `Failed to fetch robots.txt: ${response.status}`,
-      };
+export async function checkSiteSERPAppearance(input: string): Promise<IndexationCheckResult> {
+    try {
+        let domain: string;
+        if (isURL(input)) {
+            domain = cleanDomainName(input);
+        } else {
+            domain = input;
+        }
+        const queryUrl = "https://www.google.com/search?q=site:" + encodeURIComponent(domain);
+        const response = await fetch(queryUrl);
+        const text = await response.text();
+        // Check if Google indicates no results found
+        const notIndexed = text.includes("did not match any documents") || text.toLowerCase().includes("nenhum resultado encontrado");
+        return {
+            isIndexed: !notIndexed,
+            resultSummary: notIndexed ? "Site not indexed in Google SERP." : "Site appears to be indexed in Google SERP."
+        };
+    } catch (error) {
+        return {
+            isIndexed: false,
+            resultSummary: "",
+            error: error instanceof Error ? error.message : "Unknown error while checking Google SERP appearance"
+        };
     }
-
-    const robotsContent = await response.text();
-    const sitemapMentioned = robotsContent.includes("sitemap.xml");
-
-    return {
-      mentionsSitemap: sitemapMentioned,
-    };
-  } catch (error) {
-    console.error("Erro ao verificar robots.txt:", error);
-    return {
-      mentionsSitemap: false,
-      error:
-        error instanceof Error
-          ? error.message
-          : "Erro desconhecido ao verificar robots.txt",
-    };
-  }
 }
 
-export async function getIndexedTestSubdomains(domain: string): Promise<string[]> {
-  const testSubdomains = ['test', 'staging', 'dev'];
-  const cleanDomain = cleanDomainName(domain);
-  const indexedSubdomains: string[] = [];
-  for (const sub of testSubdomains) {
-    const subdomain = `${sub}.${cleanDomain}`;
-    const result = await checkDomainIndexing(subdomain);
-    if (result.isIndexed) {
-      indexedSubdomains.push(subdomain);
+/**
+ * Checks if the homepage of the brand is ranked first when the brand is searched in Google.
+ * The function uses the domain name as the search query and then parses the returned HTML to identify
+ * if the first result URL corresponds to the homepage URL.
+ * 
+ * @param input - URL of the brand's homepage or brand name
+ * @returns Promise<HomepageRankingCheckResult> - The result indicating if the homepage is ranked first.
+ */
+export async function checkHomepageRanking(input: string): Promise<HomepageRankingCheckResult> {
+    try {
+        let domain: string;
+        if (isURL(input)) {
+            domain = cleanDomainName(input);
+        } else {
+            domain = input;
+        }
+        const queryUrl = "https://www.google.com/search?q=" + encodeURIComponent(domain);
+        const response = await fetch(queryUrl);
+        const text = await response.text();
+        
+        // Use regex to capture all href links from the search result
+        const regex = /<a href=\"(https:\/\/[^\"]+)\"/g;
+        let match;
+        let firstDomainLink: string | null = null;
+        
+        // Loop through matches and pick the first link that contains the domain name
+        while ((match = regex.exec(text)) !== null) {
+            if (match[1].includes(domain)) {
+                firstDomainLink = match[1];
+                break;
+            }
+        }
+
+        // Normalize homepage URL (with and without trailing slash)
+        const homepageUrl = "https://" + domain;
+        const normalize = (url: string) => url.replace(/\/+$/, "");
+        
+        const isRankedFirst = firstDomainLink ? normalize(firstDomainLink) === normalize(homepageUrl) : false;
+        
+        return {
+            isRankedFirst: isRankedFirst,
+            resultSummary: isRankedFirst ? "Homepage is ranked first for the brand search." : "Homepage is not ranked first for the brand search."
+        };
+    } catch (error) {
+        return {
+            isRankedFirst: false,
+            resultSummary: "",
+            error: error instanceof Error ? error.message : "Erro desconhecido"
+        };
     }
-  }
-  return indexedSubdomains;
 }
 
-// Exemplo de uso:
-/*
-const result = await checkDomainIndexing('example.com');
-console.log(result);
-// { isIndexed: true, totalResults: 42 }
-// ou
-// { isIndexed: false, totalResults: 0 }
-*/
+/**
+ * Checks if the favicon is present in the HTML content of the page.
+ * The function accepts either a URL or HTML content. If a URL is provided, it fetches the content first.
+ * It then searches for a <link> tag with a rel attribute containing "icon" or "shortcut icon".
+ * 
+ * @param input - URL of the site or HTML content
+ * @returns Promise<FaviconAppearanceCheckResult> - The result indicating if the favicon is present.
+ */
+export async function checkFaviconAppearance(input: string): Promise<FaviconAppearanceCheckResult> {
+    try {
+        let content: string;
+        if (isURL(input)) {
+            const response = await fetch(input);
+            if (!response.ok) {
+                return {
+                    isFaviconPresent: false,
+                    resultSummary: "HTTP Error: " + response.status + " " + response.statusText
+                };
+            }
+            content = await response.text();
+        } else {
+            content = input;
+        }
+        
+        // Check for <link rel="icon" ...> or <link rel="shortcut icon" ...>
+        const regex = /<link[^>]+rel=[\"'](?:shortcut\s+icon|icon)[\"'][^>]*>/i;
+        const isPresent = regex.test(content);
+        
+        return {
+            isFaviconPresent: isPresent,
+            resultSummary: isPresent ? "Favicon is present." : "Favicon is not present."
+        };
+    } catch (error) {
+        return {
+            isFaviconPresent: false,
+            resultSummary: "",
+            error: error instanceof Error ? error.message : "Unknown error while checking favicon appearance"
+        };
+    }
+}
+
+/**
+ * Checks if the given URL belongs to a test environment subdomain that should not be indexed.
+ * The function checks for common patterns in the subdomain such as "test", "staging", "dev", "qa", or "demo".
+ * 
+ * @param input - URL of the site to be checked (e.g., "https://staging.example.com")
+ * @returns Promise<TestSubdomainIndexationCheckResult> - The result indicating if the subdomain is a test environment.
+ */
+export interface TestSubdomainIndexationCheckResult {
+    isTestSubdomain: boolean;
+    recommendation: string;
+    error?: string;
+}
+
+export async function checkTestSubdomainIndexation(input: string): Promise<TestSubdomainIndexationCheckResult> {
+    try {
+        if (!isURL(input)) {
+            return {
+                isTestSubdomain: false,
+                recommendation: "Input provided is not a valid URL."
+            };
+        }
+        const urlObj = new URL(input);
+        const hostname = urlObj.hostname.toLowerCase();
+        const testPatterns = ["test", "staging", "dev", "qa", "demo"];
+        let isTest = false;
+        for (const pattern of testPatterns) {
+            if (hostname.split(".")[0] === pattern || hostname.includes(`-${pattern}.`) || hostname.includes(pattern + ".")) {
+                isTest = true;
+                break;
+            }
+        }
+        const recommendation = isTest ? "Test environment subdomain should not be indexed." : "Subdomain seems to be production-ready.";
+        return {
+            isTestSubdomain: isTest,
+            recommendation: recommendation
+        };
+    } catch (error) {
+        return {
+            isTestSubdomain: false,
+            recommendation: "",
+            error: error instanceof Error ? error.message : "Unknown error"
+        };
+    }
+}

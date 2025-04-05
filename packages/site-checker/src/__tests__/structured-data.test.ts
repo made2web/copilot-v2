@@ -1,254 +1,305 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  checkStructuredDataWebsite,
-  checkStructuredDataLocalBusiness,
-  checkStructuredDataOrganization,
-  checkStructuredDataFAQPage,
-  checkStructuredDataProduct,
-  checkStructuredDataArticle,
-  checkStructuredDataCollectionPage
-} from "../structured-data";
+import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
+import { checkStructuredDataArticle, checkStructuredDataOrganization, checkStructuredDataProduct, checkStructuredDataLocalBusiness, checkStructuredDataCollection, checkStructuredDataFAQPage } from "../structured-data";
 
-describe("Structured Data Test Functions", () => {
-  beforeEach(() => {
-    vi.restoreAllMocks();
-  });
+// Helper to create a fake Response with a type definition
+function createFakeResponse(body: string, init?: ResponseInit): Response {
+    return new Response(body, init);
+}
 
-  describe("checkStructuredDataWebsite (114)", () => {
-    it("should return true when valid Website schema is present", async () => {
-      const mockHtml = `<script type="application/ld+json">
-        {
-          "@context": "https://schema.org",
-          "@type": "Website",
-          "name": "Made2Web"
-        }
-      </script>`;
+const structuredDataLocalBusinessHtml = `<html><head>
+<script type=\"application/ld+json\">{
+  \"@context\": \"http://schema.org\",
+  \"@type\": \"LocalBusiness\",
+  \"name\": \"Example Local Business\"
+}</script>
+</head><body></body></html>`;
 
-      global.fetch = vi.fn().mockResolvedValueOnce({
-        ok: true,
-        text: vi.fn().mockResolvedValueOnce(mockHtml)
-      });
+const noStructuredDataHtml = `<html><head><title>No Structured Data</title></head><body><p>Some content without structured data.</p></body></html>`;
 
-      const result = await checkStructuredDataWebsite("made2web.com");
-      expect(result.hasWebsiteSchema).toBe(true);
+const structuredDataCollectionPageHtml = `<html><head>
+<script type=\"application/ld+json\">{
+  \"@context\": \"http://schema.org\",
+  \"@type\": \"CollectionPage\",
+  \"name\": \"Example Collection Page\"
+}</script>
+</head><body></body></html>`;
+
+const structuredDataItemListHtml = `<html><head>
+<script type=\"application/ld+json\">{
+  \"@context\": \"http://schema.org\",
+  \"@type\": \"ItemList\",
+  \"itemListElement\": []
+}</script>
+</head><body></body></html>`;
+
+const structuredDataFAQHtml = `<html><head>
+<script type=\"application/ld+json\">{
+  \"@context\": \"http://schema.org\",
+  \"@type\": \"FAQPage\",
+  \"mainEntity\": []
+}</script>
+</head><body></body></html>`;
+
+describe("checkStructuredDataLocalBusiness (115)", () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
     });
 
-    it("should return false when no valid Website schema exists", async () => {
-      const mockHtml = `<script type="application/ld+json">
-        {"@type": "Organization"}
-      </script>`;
-
-      global.fetch = vi.fn().mockResolvedValueOnce({
-        ok: true,
-        text: vi.fn().mockResolvedValueOnce(mockHtml)
-      });
-
-      const result = await checkStructuredDataWebsite("made2web.com");
-      expect(result.hasWebsiteSchema).toBe(false);
-    });
-  });
-
-  describe("checkStructuredDataLocalBusiness (115)", () => {
-    it("should return true when valid LocalBusiness schema is present", async () => {
-      const mockHtml = `<script type="application/ld+json">
-        {
-          "@context": "https://schema.org",
-          "@type": "LocalBusiness",
-          "name": "Made2Web Local"
-        }
-      </script>`;
-
-      global.fetch = vi.fn().mockResolvedValueOnce({
-        ok: true,
-        text: vi.fn().mockResolvedValueOnce(mockHtml)
-      });
-
-      const result = await checkStructuredDataLocalBusiness("made2web.com");
-      expect(result.hasLocalBusinessSchema).toBe(true);
+    it("should return true when structured data for LocalBusiness is present in HTML content", async () => {
+        const result = await checkStructuredDataLocalBusiness(structuredDataLocalBusinessHtml);
+        expect(result.hasStructuredDataLocalBusiness).toBe(true);
     });
 
-    it("should return false when no valid LocalBusiness schema exists", async () => {
-      const mockHtml = `<script type="application/ld+json">
-        {"@type": "Organization"}
-      </script>`;
-
-      global.fetch = vi.fn().mockResolvedValueOnce({
-        ok: true,
-        text: vi.fn().mockResolvedValueOnce(mockHtml)
-      });
-
-      const result = await checkStructuredDataLocalBusiness("made2web.com");
-      expect(result.hasLocalBusinessSchema).toBe(false);
-    });
-  });
-
-  describe("checkStructuredDataOrganization (116)", () => {
-    it("should return true when valid Organization schema is present", async () => {
-      const mockHtml = `<script type="application/ld+json">
-        {
-          "@context": "https://schema.org",
-          "@type": "Organization",
-          "name": "Made2Web Org"
-        }
-      </script>`;
-
-      global.fetch = vi.fn().mockResolvedValueOnce({
-        ok: true,
-        text: vi.fn().mockResolvedValueOnce(mockHtml)
-      });
-
-      const result = await checkStructuredDataOrganization("made2web.com");
-      expect(result.hasOrganizationSchema).toBe(true);
+    it("should return false when no LocalBusiness structured data is present in HTML content", async () => {
+        const result = await checkStructuredDataLocalBusiness(noStructuredDataHtml);
+        expect(result.hasStructuredDataLocalBusiness).toBe(false);
     });
 
-    it("should return false when no valid Organization schema exists", async () => {
-      const mockHtml = `<script type="application/ld+json">
-        {"@type": "Website"}
-      </script>`;
-
-      global.fetch = vi.fn().mockResolvedValueOnce({
-        ok: true,
-        text: vi.fn().mockResolvedValueOnce(mockHtml)
-      });
-
-      const result = await checkStructuredDataOrganization("made2web.com");
-      expect(result.hasOrganizationSchema).toBe(false);
-    });
-  });
-
-  describe("checkStructuredDataFAQPage (117)", () => {
-    it("should return true when valid FAQPage schema is present", async () => {
-      const mockHtml = `<script type="application/ld+json">
-        {
-          "@context": "https://schema.org",
-          "@type": "FAQPage",
-          "mainEntity": []
-        }
-      </script>`;
-
-      global.fetch = vi.fn().mockResolvedValueOnce({
-        ok: true,
-        text: vi.fn().mockResolvedValueOnce(mockHtml)
-      });
-
-      const result = await checkStructuredDataFAQPage("made2web.com");
-      expect(result.hasFAQPageSchema).toBe(true);
+    it("should fetch content when a URL is provided and detect LocalBusiness structured data", async () => {
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() => 
+            Promise.resolve(createFakeResponse(structuredDataLocalBusinessHtml))
+        );
+        const result = await checkStructuredDataLocalBusiness("https://example.com/localbusiness");
+        expect(result.hasStructuredDataLocalBusiness).toBe(true);
+        expect(fetchMock).toHaveBeenCalledWith("https://example.com/localbusiness");
     });
 
-    it("should return false when no valid FAQPage schema exists", async () => {
-      const mockHtml = `<script type="application/ld+json">
-        {"@type": "Article"}
-      </script>`;
-
-      global.fetch = vi.fn().mockResolvedValueOnce({
-        ok: true,
-        text: vi.fn().mockResolvedValueOnce(mockHtml)
-      });
-
-      const result = await checkStructuredDataFAQPage("made2web.com");
-      expect(result.hasFAQPageSchema).toBe(false);
+    it("should handle HTTP errors gracefully when URL is provided", async () => {
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() => 
+            Promise.resolve(createFakeResponse('', { status: 404, statusText: 'Not Found' }))
+        );
+        const result = await checkStructuredDataLocalBusiness("https://example.com/localbusiness");
+        expect(result.hasStructuredDataLocalBusiness).toBe(false);
+        expect(result.error).toContain('HTTP Error');
+        expect(fetchMock).toHaveBeenCalledWith("https://example.com/localbusiness");
     });
-  });
+});
 
-  describe("checkStructuredDataProduct (119)", () => {
-    it("should return true when valid Product schema is present", async () => {
-      const mockHtml = `<script type="application/ld+json">
-        {
-          "@context": "https://schema.org",
-          "@type": "Product",
-          "name": "Made2Web Product"
-        }
-      </script>`;
+// Existing tests remain below
 
-      global.fetch = vi.fn().mockResolvedValueOnce({
-        ok: true,
-        text: vi.fn().mockResolvedValueOnce(mockHtml)
-      });
-
-      const result = await checkStructuredDataProduct("made2web.com");
-      expect(result.hasProductSchema).toBe(true);
+describe("checkStructuredDataProduct (119)", () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
     });
 
-    it("should return false when no valid Product schema exists", async () => {
-      const mockHtml = `<script type="application/ld+json">
-        {"@type": "Article"}
-      </script>`;
-
-      global.fetch = vi.fn().mockResolvedValueOnce({
-        ok: true,
-        text: vi.fn().mockResolvedValueOnce(mockHtml)
-      });
-
-      const result = await checkStructuredDataProduct("made2web.com");
-      expect(result.hasProductSchema).toBe(false);
-    });
-  });
-
-  describe("checkStructuredDataArticle (118)", () => {
-    it("should return true when valid Article schema is present", async () => {
-      const mockHtml = `<script type="application/ld+json">
-        {
-          "@context": "https://schema.org",
-          "@type": "Article",
-          "headline": "Made2Web Article"
-        }
-      </script>`;
-
-      global.fetch = vi.fn().mockResolvedValueOnce({
-        ok: true,
-        text: vi.fn().mockResolvedValueOnce(mockHtml)
-      });
-
-      const result = await checkStructuredDataArticle("made2web.com");
-      expect(result.hasArticleSchema).toBe(true);
+    it("should return true when structured data for Product is present in HTML content", async () => {
+        const result = await checkStructuredDataProduct(`<html><head>
+<script type=\"application/ld+json\">{
+  \"@context\": \"http://schema.org\",
+  \"@type\": \"Product\",
+  \"name\": \"Example Product\"
+}</script>
+</head><body></body></html>`);
+        expect(result.hasStructuredDataProduct).toBe(true);
     });
 
-    it("should return false when no valid Article schema exists", async () => {
-      const mockHtml = `<script type="application/ld+json">
-        {"@type": "Website"}
-      </script>`;
-
-      global.fetch = vi.fn().mockResolvedValueOnce({
-        ok: true,
-        text: vi.fn().mockResolvedValueOnce(mockHtml)
-      });
-
-      const result = await checkStructuredDataArticle("made2web.com");
-      expect(result.hasArticleSchema).toBe(false);
-    });
-  });
-
-  describe("checkStructuredDataCollectionPage (120)", () => {
-    it("should return true when valid CollectionPage schema is present", async () => {
-      const mockHtml = `<script type="application/ld+json">
-        {
-          "@context": "https://schema.org",
-          "@type": "CollectionPage",
-          "name": "Made2Web Collection"
-        }
-      </script>`;
-
-      global.fetch = vi.fn().mockResolvedValueOnce({
-        ok: true,
-        text: vi.fn().mockResolvedValueOnce(mockHtml)
-      });
-
-      const result = await checkStructuredDataCollectionPage("made2web.com");
-      expect(result.hasCollectionPageSchema).toBe(true);
+    it("should return false when no product structured data is present in HTML content", async () => {
+        const result = await checkStructuredDataProduct(noStructuredDataHtml);
+        expect(result.hasStructuredDataProduct).toBe(false);
     });
 
-    it("should return false when no valid CollectionPage schema exists", async () => {
-      const mockHtml = `<script type="application/ld+json">
-        {"@type": "Article"}
-      </script>`;
-
-      global.fetch = vi.fn().mockResolvedValueOnce({
-        ok: true,
-        text: vi.fn().mockResolvedValueOnce(mockHtml)
-      });
-
-      const result = await checkStructuredDataCollectionPage("made2web.com");
-      expect(result.hasCollectionPageSchema).toBe(false);
+    it("should fetch content when a URL is provided and detect structured data for Product", async () => {
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() => 
+            Promise.resolve(createFakeResponse(`<html><head>
+<script type=\"application/ld+json\">{
+  \"@context\": \"http://schema.org\",
+  \"@type\": \"Product\",
+  \"name\": \"Example Product\"
+}</script>
+</head><body></body></html>`))
+        );
+        const result = await checkStructuredDataProduct("https://example.com/product");
+        expect(result.hasStructuredDataProduct).toBe(true);
+        expect(fetchMock).toHaveBeenCalledWith("https://example.com/product");
     });
-  });
+
+    it("should handle HTTP errors gracefully when URL is provided", async () => {
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() => 
+            Promise.resolve(createFakeResponse('', { status: 404, statusText: 'Not Found' }))
+        );
+        const result = await checkStructuredDataProduct("https://example.com/product");
+        expect(result.hasStructuredDataProduct).toBe(false);
+        expect(result.error).toContain('HTTP Error');
+        expect(fetchMock).toHaveBeenCalledWith("https://example.com/product");
+    });
+});
+
+describe("checkStructuredDataArticle (118)", () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+    
+    it("should return true when structured data for Article is present in HTML content", async () => {
+        const result = await checkStructuredDataArticle(`<html><head>
+<script type=\"application/ld+json\">{
+  \"@context\": \"http://schema.org\",
+  \"@type\": \"Article\",
+  \"headline\": \"Example Article\"
+}</script>
+</head><body></body></html>`);
+        expect(result.hasStructuredDataArticle).toBe(true);
+    });
+
+    it("should return true when structured data for BlogPosting is present in HTML content", async () => {
+        const result = await checkStructuredDataArticle(`<html><head>
+<script type=\"application/ld+json\">{
+  \"@context\": \"http://schema.org\",
+  \"@type\": \"BlogPosting\",
+  \"headline\": \"Example Blog Post\"
+}</script>
+</head><body></body></html>`);
+        expect(result.hasStructuredDataArticle).toBe(true);
+    });
+
+    it("should return false when no article structured data is present in HTML content", async () => {
+        const result = await checkStructuredDataArticle(noStructuredDataHtml);
+        expect(result.hasStructuredDataArticle).toBe(false);
+    });
+
+    it("should fetch content when a URL is provided and detect structured data for Article", async () => {
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() => 
+            Promise.resolve(createFakeResponse(`<html><head>
+<script type=\"application/ld+json\">{
+  \"@context\": \"http://schema.org\",
+  \"@type\": \"Article\",
+  \"headline\": \"Example Article\"
+}</script>
+</head><body></body></html>`))
+        );
+        const result = await checkStructuredDataArticle("https://example.com/article");
+        expect(result.hasStructuredDataArticle).toBe(true);
+        expect(fetchMock).toHaveBeenCalledWith("https://example.com/article");
+    });
+
+    it("should handle HTTP errors gracefully when URL is provided", async () => {
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() => 
+            Promise.resolve(createFakeResponse('', { status: 500, statusText: 'Internal Server Error' }))
+        );
+        const result = await checkStructuredDataArticle("https://example.com/article");
+        expect(result.hasStructuredDataArticle).toBe(false);
+        expect(result.error).toContain('HTTP Error');
+        expect(fetchMock).toHaveBeenCalledWith("https://example.com/article");
+    });
+});
+
+describe("checkStructuredDataOrganization (116)", () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    it("should return true when structured data for Organization is present in HTML content", async () => {
+        const result = await checkStructuredDataOrganization(`<html><head>
+<script type=\"application/ld+json\">{
+  \"@context\": \"http://schema.org\",
+  \"@type\": \"Organization\",
+  \"name\": \"Example Organization\"
+}</script>
+</head><body></body></html>`);
+        expect(result.hasStructuredDataOrganization).toBe(true);
+    });
+
+    it("should return false when no organization structured data is present in HTML content", async () => {
+        const result = await checkStructuredDataOrganization(noStructuredDataHtml);
+        expect(result.hasStructuredDataOrganization).toBe(false);
+    });
+
+    it("should fetch content when a URL is provided and detect structured data for Organization", async () => {
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() => 
+            Promise.resolve(createFakeResponse(`<html><head>
+<script type=\"application/ld+json\">{
+  \"@context\": \"http://schema.org\",
+  \"@type\": \"Organization\",
+  \"name\": \"Example Organization\"
+}</script>
+</head><body></body></html>`))
+        );
+        const result = await checkStructuredDataOrganization("https://example.com/organization");
+        expect(result.hasStructuredDataOrganization).toBe(true);
+        expect(fetchMock).toHaveBeenCalledWith("https://example.com/organization");
+    });
+
+    it("should handle HTTP errors gracefully when URL is provided", async () => {
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() => 
+            Promise.resolve(createFakeResponse('', { status: 404, statusText: 'Not Found' }))
+        );
+        const result = await checkStructuredDataOrganization("https://example.com/organization");
+        expect(result.hasStructuredDataOrganization).toBe(false);
+        expect(result.error).toContain('HTTP Error');
+        expect(fetchMock).toHaveBeenCalledWith("https://example.com/organization");
+    });
+});
+
+describe("checkStructuredDataCollection (120)", () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    it("should return true when CollectionPage structured data is present in HTML content", async () => {
+        const result = await checkStructuredDataCollection(structuredDataCollectionPageHtml);
+        expect(result.hasStructuredDataCollection).toBe(true);
+    });
+
+    it("should return true when ItemList structured data is present in HTML content", async () => {
+        const result = await checkStructuredDataCollection(structuredDataItemListHtml);
+        expect(result.hasStructuredDataCollection).toBe(true);
+    });
+
+    it("should return false when no CollectionPage/ItemList structured data is present", async () => {
+        const result = await checkStructuredDataCollection(noStructuredDataHtml);
+        expect(result.hasStructuredDataCollection).toBe(false);
+    });
+
+    it("should fetch content when a URL is provided and detect CollectionPage structured data", async () => {
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() =>
+            Promise.resolve(createFakeResponse(structuredDataCollectionPageHtml))
+        );
+        const result = await checkStructuredDataCollection("https://example.com/collection");
+        expect(result.hasStructuredDataCollection).toBe(true);
+        expect(fetchMock).toHaveBeenCalledWith("https://example.com/collection");
+    });
+
+    it("should handle HTTP errors gracefully when URL is provided", async () => {
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() =>
+            Promise.resolve(createFakeResponse('', { status: 404, statusText: 'Not Found' }))
+        );
+        const result = await checkStructuredDataCollection("https://example.com/collection");
+        expect(result.hasStructuredDataCollection).toBe(false);
+        expect(result.error).toContain('HTTP Error');
+        expect(fetchMock).toHaveBeenCalledWith("https://example.com/collection");
+    });
+});
+
+describe("checkStructuredDataFAQPage (117)", () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    it("should return true when structured data for FAQPage is present in HTML content", async () => {
+        const result = await checkStructuredDataFAQPage(structuredDataFAQHtml);
+        expect(result.hasStructuredDataFAQPage).toBe(true);
+    });
+
+    it("should return false when no FAQPage structured data is present in HTML content", async () => {
+        const result = await checkStructuredDataFAQPage(noStructuredDataHtml);
+        expect(result.hasStructuredDataFAQPage).toBe(false);
+    });
+
+    it("should fetch content when a URL is provided and detect FAQPage structured data", async () => {
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() =>
+            Promise.resolve(createFakeResponse(structuredDataFAQHtml))
+        );
+        const result = await checkStructuredDataFAQPage("https://example.com/faq");
+        expect(result.hasStructuredDataFAQPage).toBe(true);
+        expect(fetchMock).toHaveBeenCalledWith("https://example.com/faq");
+    });
+
+    it("should handle HTTP errors gracefully when URL is provided", async () => {
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() =>
+            Promise.resolve(createFakeResponse('', { status: 404, statusText: 'Not Found' }))
+        );
+        const result = await checkStructuredDataFAQPage("https://example.com/faq");
+        expect(result.hasStructuredDataFAQPage).toBe(false);
+        expect(result.error).toContain('HTTP Error');
+        expect(fetchMock).toHaveBeenCalledWith("https://example.com/faq");
+    });
 });

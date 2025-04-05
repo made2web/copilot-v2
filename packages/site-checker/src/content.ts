@@ -1,89 +1,125 @@
-import { cleanDomainName } from "./utils.js";
+import { isURL } from "./utils.js";
 
-interface ContentWordCountCheckResult {
-  hasLessThan200Words: boolean;
-  wordCount: number;
-  error?: string;
+export interface ContentUnder200CheckResult {
+    hasLessThan200Words: boolean;
+    wordCount: number;
+    error?: string;
+    return_key: boolean;
 }
 
-interface ParagraphLineCountCheckResult {
-  paragraphsExceedingLimit: number;
-  totalParagraphs: number;
-  error?: string;
-}
-
-/**
- * Verifies if the homepage of the domain has less than 200 words of content
- * @param domain - The domain to be checked (e.g., "example.com")
- * @returns Promise<ContentWordCountCheckResult> - The result of the check
- */
-export async function checkPageContentWordCount(domain: string): Promise<ContentWordCountCheckResult> {
-  try {
-    const cleanDomain = cleanDomainName(domain);
-    const response = await fetch(`https://${cleanDomain}/`);
-    if (!response.ok) {
-      return {
-        hasLessThan200Words: false,
-        wordCount: 0,
-        error: `Failed to fetch page: ${response.status}`,
-      };
-    }
-    const html = await response.text();
-    const textContent = html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
-    const wordCount = textContent.split(" ").length;
-    return {
-      hasLessThan200Words: wordCount < 200,
-      wordCount,
-    };
-  } catch (error) {
-    return {
-      hasLessThan200Words: false,
-      wordCount: 0,
-      error: error instanceof Error ? error.message : "Unknown error while checking content word count",
-    };
-  }
+export interface ParagraphLineCheckResult {
+    paragraphsValid: boolean;
+    invalidParagraphs: number;
+    totalParagraphs: number;
+    return_key: boolean;
+    error?: string;
 }
 
 /**
- * Verifies if the homepage paragraphs are well divided, with a maximum of 3 lines per paragraph
- * @param domain - The domain to be checked (e.g., "example.com")
- * @returns Promise<ParagraphLineCountCheckResult> - The result of the check
+ * Checks if the given HTML content or URL has less than 200 words.
+ * If input is a URL, it fetches the content first.
+ * @param input - HTML content or a URL to check.
+ * @returns Promise<ContentUnder200CheckResult> - The result of the check
  */
-export async function checkParagraphLineCount(domain: string): Promise<ParagraphLineCountCheckResult> {
-  try {
-    const cleanDomain = cleanDomainName(domain);
-    const response = await fetch(`https://${cleanDomain}/`);
-    if (!response.ok) {
-      return {
-        paragraphsExceedingLimit: 0,
-        totalParagraphs: 0,
-        error: `Failed to fetch page: ${response.status}`,
-      };
+export async function checkContentUnder200Words(input: string): Promise<ContentUnder200CheckResult> {
+    try {
+        let content: string;
+        
+        if (isURL(input)) {
+            const response = await fetch(input);
+            if (!response.ok) {
+                return {
+                    hasLessThan200Words: false,
+                    wordCount: 0,
+                    error: "HTTP Error: " + response.status + " " + response.statusText,
+                    return_key: false
+                };
+            }
+            content = await response.text();
+        } else {
+            content = input;
+        }
+
+        const cleanedContent = content
+            .replace(/<[^>]+>/g, ' ')
+            .replace(/&#?[a-z0-9]+;/gi, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        const wordCount = cleanedContent === "" ? 0 : cleanedContent.split(/\s+/).filter(word => word.length > 0).length;
+        
+        return {
+            hasLessThan200Words: wordCount < 200,
+            wordCount,
+            return_key: wordCount < 200
+        };
+    } catch (error) {
+        return {
+            hasLessThan200Words: false,
+            wordCount: 0,
+            error: error instanceof Error ? error.message : "Erro desconhecido",
+            return_key: false
+        };
     }
-    const html = await response.text();
-    const paragraphRegex = /<p[^>]*>(.*?)<\/p>/g;
-    const paragraphs: string[] = [];
-    let match;
-    while ((match = paragraphRegex.exec(html)) !== null) {
-      paragraphs.push(match[1].replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim());
+}
+
+/**
+ * Checks if the paragraphs in the given HTML content or URL are well divided with a maximum of 3 lines per paragraph.
+ * A paragraph is considered to have multiple lines if it contains <br> tags. The line count is determined by counting the number
+ * of <br> tags and adding one. If any paragraph exceeds 3 lines, the check fails.
+ * @param input - HTML content or a URL to check.
+ * @returns Promise<ParagraphLineCheckResult> - The result of the paragraph line check
+ */
+export async function checkParagraphsMax3Lines(input: string): Promise<ParagraphLineCheckResult> {
+    try {
+        let content: string;
+
+        if (isURL(input)) {
+            const response = await fetch(input);
+            if (!response.ok) {
+                return {
+                    paragraphsValid: false,
+                    invalidParagraphs: 0,
+                    totalParagraphs: 0,
+                    return_key: false,
+                    error: "HTTP Error: " + response.status + " " + response.statusText
+                };
+            }
+            content = await response.text();
+        } else {
+            content = input;
+        }
+
+        // Regex to match all paragraph tags and capture their inner HTML
+        const paragraphRegex = /<p\b[^>]*>(.*?)<\/p>/gims;
+        let match: RegExpExecArray | null;
+        let totalParagraphs = 0;
+        let invalidParagraphs = 0;
+
+        while ((match = paragraphRegex.exec(content)) !== null) {
+            totalParagraphs++;
+            const paragraphContent = match[1];
+            // Count <br> tags. Each <br> contributes to an additional line
+            const brMatches = paragraphContent.match(/<br\s*\/?>/gims);
+            const lineCount = (brMatches ? brMatches.length : 0) + 1;
+            if (lineCount > 3) {
+                invalidParagraphs++;
+            }
+        }
+
+        return {
+            paragraphsValid: invalidParagraphs === 0,
+            invalidParagraphs,
+            totalParagraphs,
+            return_key: invalidParagraphs === 0
+        };
+    } catch (error) {
+        return {
+            paragraphsValid: false,
+            invalidParagraphs: 0,
+            totalParagraphs: 0,
+            return_key: false,
+            error: error instanceof Error ? error.message : "Erro desconhecido"
+        };
     }
-    const maxCharactersPerLine = 100; // Assumption for desktop
-    let exceedingCount = 0;
-    paragraphs.forEach(p => {
-      const lines = Math.ceil(p.length / maxCharactersPerLine);
-      if (lines > 3) {
-        exceedingCount++;
-      }
-    });
-    return {
-      paragraphsExceedingLimit: exceedingCount,
-      totalParagraphs: paragraphs.length,
-    };
-  } catch (error) {
-    return {
-      paragraphsExceedingLimit: 0,
-      totalParagraphs: 0,
-      error: error instanceof Error ? error.message : "Unknown error while checking paragraph line count",
-    };
-  }
 }

@@ -1,61 +1,113 @@
-import { cleanDomainName } from "./utils.js";
+import { isURL } from "./utils.js";
 
-interface AuthorMentionResult {
-  isAuthorMentioned: boolean;
-  error?: string;
+export interface AuthorRelTagResult {
+    found: boolean;
+    error?: string;
 }
 
-interface InternalLinksResult {
-  hasMinimumInternalLinks: boolean;
-  error?: string;
+export interface InternalLinkCheckResult {
+    hasMinInternalLinks: boolean;
+    internalLinkCount: number;
+    error?: string;
 }
 
-export async function checkAuthorMention(domain: string): Promise<AuthorMentionResult> {
-  try {
-    const cleanDomain = cleanDomainName(domain);
-    const postsUrl = `https://${cleanDomain}/posts`;
-    const response = await fetch(postsUrl);
-    if (!response.ok) {
-      return {
-        isAuthorMentioned: false,
-        error: `Failed to fetch posts: ${response.status}`,
-      };
+/**
+ * Checks if the provided HTML content or URL contains a rel="author" attribute.
+ *
+ * @param input - HTML content or URL to be checked.
+ * @returns Promise<AuthorRelTagResult> - The result of the check.
+ */
+export async function checkAuthorRelTag(input: string): Promise<AuthorRelTagResult> {
+    try {
+        let content: string;
+
+        if (isURL(input)) {
+            const response = await fetch(input);
+            if (!response.ok) {
+                return {
+                    found: false,
+                    error: "HTTP Error: " + response.status + " " + response.statusText
+                };
+            }
+            content = await response.text();
+        } else {
+            content = input;
+        }
+
+        // Check if the HTML contains the rel="author" attribute
+        const found = /rel\s*=\s*["']author["']/i.test(content);
+        return { found: found };
+    } catch (error) {
+        return {
+            found: false,
+            error: error instanceof Error ? error.message : "Unknown error"
+        };
     }
-    const html = await response.text();
-    const hasRelAuthor = /rel=["']author["']/i.test(html);
-    return {
-      isAuthorMentioned: hasRelAuthor,
-    };
-  } catch (error) {
-    console.error("Error checking author mention:", error);
-    return {
-      isAuthorMentioned: false,
-      error: error instanceof Error ? error.message : "Unknown error",
-    };
-  }
 }
 
-export async function checkInternalLinks(domain: string): Promise<InternalLinksResult> {
-  try {
-    const cleanDomain = cleanDomainName(domain);
-    const url = `https://${cleanDomain}`;
-    const response = await fetch(url);
-    if (!response.ok) {
-      return {
-        hasMinimumInternalLinks: false,
-        error: `Failed to fetch page: ${response.status}`,
-      };
+/**
+ * Checks if the provided HTML content or URL contains at least 3 internal linkages.
+ * An internal link is considered as:
+ *   - A link starting with a forward slash (e.g., "/about")
+ *   - Or an absolute URL whose hostname matches the hostname of the provided URL input
+ *
+ * @param input - HTML content or URL to be checked.
+ * @returns Promise<InternalLinkCheckResult> - The result of the check
+ */
+export async function checkInternalLinkCount(input: string): Promise<InternalLinkCheckResult> {
+    try {
+        let content: string;
+        let baseHost: string | null = null;
+
+        if (isURL(input)) {
+            const response = await fetch(input);
+            if (!response.ok) {
+                return {
+                    hasMinInternalLinks: false,
+                    internalLinkCount: 0,
+                    error: "HTTP Error: " + response.status + " " + response.statusText
+                };
+            }
+            content = await response.text();
+            try {
+                baseHost = new URL(input).hostname;
+            } catch (_) {
+                baseHost = null;
+            }
+        } else {
+            content = input;
+        }
+
+        // Use regex to find all <a> tags with an href attribute
+        const anchorRegex = /<a\s+[^>]*href=["']([^"']+)["'][^>]*>/gi;
+        let match;
+        let internalCount = 0;
+
+        while ((match = anchorRegex.exec(content)) !== null) {
+            const href = match[1];
+            if (href.startsWith("/")) {
+                internalCount++;
+            } else if (href.startsWith("http://") || href.startsWith("https://")) {
+                if (baseHost) {
+                    try {
+                        const linkHost = new URL(href).hostname;
+                        if (linkHost === baseHost) {
+                            internalCount++;
+                        }
+                    } catch (_) {}
+                }
+            }
+        }
+
+        return {
+            hasMinInternalLinks: internalCount >= 3,
+            internalLinkCount: internalCount
+        };
+    } catch (error) {
+        return {
+            hasMinInternalLinks: false,
+            internalLinkCount: 0,
+            error: error instanceof Error ? error.message : "Unknown error"
+        };
     }
-    const html = await response.text();
-    const internalLinks = html.match(new RegExp(`href=["']https?://${cleanDomain}[^"']*["']`, 'g')) || [];
-    return {
-      hasMinimumInternalLinks: internalLinks.length >= 3,
-    };
-  } catch (error) {
-    console.error("Error checking internal links:", error);
-    return {
-      hasMinimumInternalLinks: false,
-      error: error instanceof Error ? error.message : "Unknown error",
-    };
-  }
 }

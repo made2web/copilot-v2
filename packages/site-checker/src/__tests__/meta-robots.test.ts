@@ -1,329 +1,248 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { checkMetaRobots, isUniqueMetaRobots, isPageIndexed, isPageFollow, isPageNoindex } from "../meta-robots";
+import { describe, it, expect, vi } from "vitest";
+import { checkMetaRobots, checkIfMetaRobotsExists, checkUniqueMetaRobots, checkPaginationFollow, checkThankYouPageNoindex, checkPageIndexFollow } from "../meta-robots";
 
-describe("Meta Robots Test Functions", () => {
-  beforeEach(() => {
-    vi.restoreAllMocks();
-  });
+// Helper to create a fake Response
+function createFakeResponse(body: string, init?: ResponseInit): Response {
+    return new Response(body, init);
+}
 
-  describe("checkMetaRobots (13)", () => {
-    it("should return hasMetaRobots true when page contains meta robots tag", async () => {
-      const mockHtml = `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <meta name=\"robots\" content=\"index, follow\">
-          </head>
-        </html>
-      `;
-      
-      global.fetch = vi.fn().mockResolvedValueOnce({
-        ok: true,
-        text: vi.fn().mockResolvedValueOnce(mockHtml)
-      });
-
-      const result = await checkMetaRobots("made2web.com");
-      expect(result.hasMetaRobots).toBe(true);
+describe("checkMetaRobots (12)", () => {
+    it("should detect noindex in HTML content", async () => {
+        const html = "<html><head><meta name=\"robots\" content=\"noindex, nofollow\"></head><body></body></html>";
+        const result = await checkMetaRobots(html);
+        expect(result.metaNoindexFound).toBe(true);
     });
 
-    it("should return hasMetaRobots false when page lacks meta robots tag", async () => {
-      const mockHtml = `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>No Meta Here</title>
-          </head>
-        </html>
-      `;
-      
-      global.fetch = vi.fn().mockResolvedValueOnce({
-        ok: true,
-        text: vi.fn().mockResolvedValueOnce(mockHtml)
-      });
-
-      const result = await checkMetaRobots("made2web.com");
-      expect(result.hasMetaRobots).toBe(false);
-    });
-  });
-
-  describe("checkImportantPagesBlockRobots (12)", () => {
-    it("should return true when important page is blocked with noindex", async () => {
-      const mockHtml = `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <meta name=\"robots\" content=\"noindex, nofollow\">
-          </head>
-        </html>
-      `;
-      
-      global.fetch = vi.fn().mockResolvedValueOnce({
-        ok: true,
-        text: vi.fn().mockResolvedValueOnce(mockHtml)
-      });
-
-      const result = await checkMetaRobots("made2web.com/important-page");
-      if (result.hasMetaRobots) {
-        expect(result.hasMetaRobots).toBe(true);
-      }
+    it("should not detect noindex when not present", async () => {
+        const html = "<html><head><meta name=\"robots\" content=\"index, follow\"></head><body></body></html>";
+        const result = await checkMetaRobots(html);
+        expect(result.metaNoindexFound).toBe(false);
     });
 
-    it("should return false when important page is not blocked with noindex", async () => {
-      const mockHtml = `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <meta name=\"robots\" content=\"index, follow\">
-          </head>
-        </html>
-      `;
-      
-      global.fetch = vi.fn().mockResolvedValueOnce({
-        ok: true,
-        text: vi.fn().mockResolvedValueOnce(mockHtml)
-      });
-
-      const result = await checkMetaRobots("made2web.com/important-page");
-      if (!result.hasMetaRobots) {
-        expect(result.hasMetaRobots).toBe(false);
-      }
-    });
-  });
-
-  describe("isUniqueMetaRobots (14)", () => {
-    it("should return true when there is exactly one meta robots tag on the page", async () => {
-      const mockHtml = `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <meta name=\"robots\" content=\"index, follow\">
-          </head>
-        </html>
-      `;
-      
-      global.fetch = vi.fn().mockResolvedValueOnce({
-        ok: true,
-        text: vi.fn().mockResolvedValueOnce(mockHtml)
-      });
-
-      const result = await isUniqueMetaRobots("made2web.com");
-      expect(result).toBe(true);
+    it("should detect noindex from URL content", async () => {
+        const html = "<html><head><meta name=\"robots\" content=\"noindex\"></head><body></body></html>";
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() => 
+            Promise.resolve(createFakeResponse(html))
+        );
+        const result = await checkMetaRobots("http://example.com");
+        expect(result.metaNoindexFound).toBe(true);
+        fetchMock.mockRestore();
     });
 
-    it("should return false when there are multiple meta robots tags on the page", async () => {
-      const mockHtml = `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <meta name=\"robots\" content=\"index, follow\">
-            <meta name=\"robots\" content=\"noindex, nofollow\">
-          </head>
-        </html>
-      `;
-      
-      global.fetch = vi.fn().mockResolvedValueOnce({
-        ok: true,
-        text: vi.fn().mockResolvedValueOnce(mockHtml)
-      });
+    it("should return error on fetch failure", async () => {
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() => 
+            Promise.resolve(createFakeResponse("", { status: 500, statusText: "Internal Server Error" }))
+        );
+        const result = await checkMetaRobots("http://example.com");
+        expect(result.error).toContain("HTTP Error");
+        fetchMock.mockRestore();
+    });
+});
 
-      const result = await isUniqueMetaRobots("made2web.com");
-      expect(result).toBe(false);
+describe("checkIfMetaRobotsExists (13)", () => {
+    it("should detect the existence of meta robots tag in HTML content", async () => {
+        const html = "<html><head><meta name=\"robots\" content=\"index, follow\"></head><body></body></html>";
+        const result = await checkIfMetaRobotsExists(html);
+        expect(result.metaTagFound).toBe(true);
     });
 
-    it("should return false when there is no meta robots tag on the page", async () => {
-      const mockHtml = `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>No Meta Robots</title>
-          </head>
-        </html>
-      `;
-      
-      global.fetch = vi.fn().mockResolvedValueOnce({
-        ok: true,
-        text: vi.fn().mockResolvedValueOnce(mockHtml)
-      });
-
-      const result = await isUniqueMetaRobots("made2web.com");
-      expect(result).toBe(false);
-    });
-  });
-
-  describe("isPageIndexed (15)", () => {
-    it("should return true when page meta robots content is 'index, follow'", async () => {
-      const mockHtml = `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <meta name=\"robots\" content=\"index, follow\">
-          </head>
-        </html>
-      `;
-      
-      global.fetch = vi.fn().mockResolvedValueOnce({
-        ok: true,
-        text: vi.fn().mockResolvedValueOnce(mockHtml)
-      });
-
-      const result = await isPageIndexed("made2web.com");
-      expect(result).toBe(true);
+    it("should return false if meta robots tag does not exist in HTML content", async () => {
+        const html = "<html><head><title>Test page</title></head><body></body></html>";
+        const result = await checkIfMetaRobotsExists(html);
+        expect(result.metaTagFound).toBe(false);
     });
 
-    it("should return false when page meta robots content is not 'index, follow'", async () => {
-      const mockHtml = `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <meta name=\"robots\" content=\"noindex, nofollow\">
-          </head>
-        </html>
-      `;
-      
-      global.fetch = vi.fn().mockResolvedValueOnce({
-        ok: true,
-        text: vi.fn().mockResolvedValueOnce(mockHtml)
-      });
-
-      const result = await isPageIndexed("made2web.com");
-      expect(result).toBe(false);
+    it("should detect meta robots tag from URL content", async () => {
+        const html = "<html><head><meta name=\"robots\" content=\"noindex\"></head><body></body></html>";
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() =>
+            Promise.resolve(createFakeResponse(html))
+        );
+        const result = await checkIfMetaRobotsExists("http://example.com");
+        expect(result.metaTagFound).toBe(true);
+        fetchMock.mockRestore();
     });
 
-    it("should return false when page lacks meta robots tag", async () => {
-      const mockHtml = `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>No Meta Robots</title>
-          </head>
-        </html>
-      `;
-      
-      global.fetch = vi.fn().mockResolvedValueOnce({
-        ok: true,
-        text: vi.fn().mockResolvedValueOnce(mockHtml)
-      });
-
-      const result = await isPageIndexed("made2web.com");
-      expect(result).toBe(false);
+    it("should return error on fetch failure", async () => {
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() =>
+            Promise.resolve(createFakeResponse("", { status: 404, statusText: "Not Found" }))
+        );
+        const result = await checkIfMetaRobotsExists("http://example.com");
+        expect(result.error).toContain("HTTP Error");
+        fetchMock.mockRestore();
     });
-  });
+});
 
-  describe("isPageFollow (16)", () => {
-    it("should return true when pagination has follow directive", async () => {
-      const mockHtml = `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <meta name=\"robots\" content=\"follow\">
-          </head>
-        </html>
-      `;
-      
-      global.fetch = vi.fn().mockResolvedValueOnce({
-        ok: true,
-        text: vi.fn().mockResolvedValueOnce(mockHtml)
-      });
-
-      const result = await isPageFollow("made2web.com/blog?page=2");
-      expect(result).toBe(true);
+describe("checkUniqueMetaRobots (14)", () => {
+    it("should return unique true when exactly one meta robots tag is present in HTML content", async () => {
+        const html = "<html><head><meta name=\"robots\" content=\"noindex\"></head><body></body></html>";
+        const result = await checkUniqueMetaRobots(html);
+        expect(result.unique).toBe(true);
+        expect(result.count).toBe(1);
     });
 
-    it("should return true when pagination has index, follow", async () => {
-      const mockHtml = `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <meta name=\"robots\" content=\"index, follow\">
-          </head>
-        </html>
-      `;
-      
-      global.fetch = vi.fn().mockResolvedValueOnce({
-        ok: true,
-        text: vi.fn().mockResolvedValueOnce(mockHtml)
-      });
-
-      const result = await isPageFollow("made2web.com/blog?page=2");
-      expect(result).toBe(true);
+    it("should return unique false when multiple meta robots tags are present", async () => {
+        const html = "<html><head>" +
+                     "<meta name=\"robots\" content=\"noindex\">" +
+                     "<meta name=\"robots\" content=\"index,follow\">" +
+                     "</head><body></body></html>";
+        const result = await checkUniqueMetaRobots(html);
+        expect(result.unique).toBe(false);
+        expect(result.count).toBe(2);
     });
 
-    it("should return false when pagination has nofollow", async () => {
-      const mockHtml = `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <meta name=\"robots\" content=\"nofollow\">
-          </head>
-        </html>
-      `;
-      
-      global.fetch = vi.fn().mockResolvedValueOnce({
-        ok: true,
-        text: vi.fn().mockResolvedValueOnce(mockHtml)
-      });
-
-      const result = await isPageFollow("made2web.com/blog?page=2");
-      expect(result).toBe(false);
+    it("should return unique false when no meta robots tag is present", async () => {
+        const html = "<html><head><title>No robots meta</title></head><body></body></html>";
+        const result = await checkUniqueMetaRobots(html);
+        expect(result.unique).toBe(false);
+        expect(result.count).toBe(0);
     });
 
-    it("should return false when pagination lacks meta robots", async () => {
-      const mockHtml = `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>Pagination Page</title>
-          </head>
-        </html>
-      `;
-      
-      global.fetch = vi.fn().mockResolvedValueOnce({
-        ok: true,
-        text: vi.fn().mockResolvedValueOnce(mockHtml)
-      });
-
-      const result = await isPageFollow("made2web.com/blog?page=2");
-      expect(result).toBe(false);
-    });
-  });
-
-  describe("isPageNoindex (17)", () => {
-    it("should return true when reward page is set to noindex", async () => {
-      const mockHtml = `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <meta name=\"robots\" content=\"noindex, follow\">
-          </head>
-        </html>
-      `;
-      
-      global.fetch = vi.fn().mockResolvedValueOnce({
-        ok: true,
-        text: vi.fn().mockResolvedValueOnce(mockHtml)
-      });
-
-      const result = await isPageNoindex("made2web.com/reward");
-      expect(result).toBe(true);
+    it("should return unique true from URL content", async () => {
+        const html = "<html><head><meta name=\"robots\" content=\"noindex\"></head><body></body></html>";
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() =>
+            Promise.resolve(createFakeResponse(html))
+        );
+        const result = await checkUniqueMetaRobots("http://example.com");
+        expect(result.unique).toBe(true);
+        expect(result.count).toBe(1);
+        fetchMock.mockRestore();
     });
 
-    it("should return false when reward page is not set to noindex", async () => {
-      const mockHtml = `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <meta name=\"robots\" content=\"index, follow\">
-          </head>
-        </html>
-      `;
-      
-      global.fetch = vi.fn().mockResolvedValueOnce({
-        ok: true,
-        text: vi.fn().mockResolvedValueOnce(mockHtml)
-      });
-
-      const result = await isPageNoindex("made2web.com/reward");
-      expect(result).toBe(false);
+    it("should return error on URL fetch failure", async () => {
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() =>
+            Promise.resolve(createFakeResponse("", { status: 500, statusText: "Internal Server Error" }))
+        );
+        const result = await checkUniqueMetaRobots("http://example.com");
+        expect(result.error).toContain("HTTP Error");
+        fetchMock.mockRestore();
     });
-  });
+});
+
+describe("checkPaginationFollow (16)", () => {
+    it("should return true when meta robots tag has follow directive", async () => {
+        const html = "<html><head><meta name=\"robots\" content=\"index, follow\"></head><body></body></html>";
+        const result = await checkPaginationFollow(html);
+        expect(result.follow).toBe(true);
+    });
+
+    it("should return false when meta robots tag has nofollow directive", async () => {
+        const html = "<html><head><meta name=\"robots\" content=\"noindex, nofollow\"></head><body></body></html>";
+        const result = await checkPaginationFollow(html);
+        expect(result.follow).toBe(false);
+    });
+
+    it("should default to true when meta robots tag is absent", async () => {
+        const html = "<html><head><title>Test page</title></head><body></body></html>";
+        const result = await checkPaginationFollow(html);
+        expect(result.follow).toBe(true);
+    });
+
+    it("should check follow status from URL content", async () => {
+        const html = "<html><head><meta name=\"robots\" content=\"index, follow\"></head><body></body></html>";
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() =>
+            Promise.resolve(createFakeResponse(html))
+        );
+        const result = await checkPaginationFollow("http://example-pagination.com");
+        expect(result.follow).toBe(true);
+        fetchMock.mockRestore();
+    });
+
+    it("should return error on URL fetch failure", async () => {
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() =>
+            Promise.resolve(createFakeResponse("", { status: 500, statusText: "Internal Server Error" }))
+        );
+        const result = await checkPaginationFollow("http://example-pagination.com");
+        expect(result.error).toContain("HTTP Error");
+        fetchMock.mockRestore();
+    });
+});
+
+describe("checkThankYouPageNoindex (17)", () => {
+    it("should return true when meta robots tag contains noindex in HTML content", async () => {
+        const html = "<html><head><meta name=\"robots\" content=\"noindex, follow\"></head><body></body></html>";
+        const result = await checkThankYouPageNoindex(html);
+        expect(result.thankYouNoindex).toBe(true);
+    });
+
+    it("should return false when meta robots tag does not contain noindex in HTML content", async () => {
+        const html = "<html><head><meta name=\"robots\" content=\"index, follow\"></head><body></body></html>";
+        const result = await checkThankYouPageNoindex(html);
+        expect(result.thankYouNoindex).toBe(false);
+    });
+
+    it("should check noindex from URL content", async () => {
+        const html = "<html><head><meta name=\"robots\" content=\"noindex\"></head><body></body></html>";
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() =>
+            Promise.resolve(createFakeResponse(html))
+        );
+        const result = await checkThankYouPageNoindex("http://example-thankyou.com");
+        expect(result.thankYouNoindex).toBe(true);
+        fetchMock.mockRestore();
+    });
+
+    it("should return error on fetch failure for URL content", async () => {
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() =>
+            Promise.resolve(createFakeResponse("", { status: 500, statusText: "Internal Server Error" }))
+        );
+        const result = await checkThankYouPageNoindex("http://example-thankyou.com");
+        expect(result.error).toContain("HTTP Error");
+        fetchMock.mockRestore();
+    });
+});
+
+describe("checkPageIndexFollow (15)", () => {
+    it("should return index true and follow true when meta tag contains 'index, follow'", async () => {
+        const html = "<html><head><meta name=\"robots\" content=\"index, follow\"></head><body></body></html>";
+        const result = await checkPageIndexFollow(html);
+        expect(result.index).toBe(true);
+        expect(result.follow).toBe(true);
+    });
+
+    it("should return index false and follow true when meta tag contains 'noindex, follow'", async () => {
+        const html = "<html><head><meta name=\"robots\" content=\"noindex, follow\"></head><body></body></html>";
+        const result = await checkPageIndexFollow(html);
+        expect(result.index).toBe(false);
+        expect(result.follow).toBe(true);
+    });
+
+    it("should return index true and follow false when meta tag contains 'index, nofollow'", async () => {
+        const html = "<html><head><meta name=\"robots\" content=\"index, nofollow\"></head><body></body></html>";
+        const result = await checkPageIndexFollow(html);
+        expect(result.index).toBe(true);
+        expect(result.follow).toBe(false);
+    });
+
+    it("should return index false and follow false when meta tag contains 'noindex, nofollow'", async () => {
+        const html = "<html><head><meta name=\"robots\" content=\"noindex, nofollow\"></head><body></body></html>";
+        const result = await checkPageIndexFollow(html);
+        expect(result.index).toBe(false);
+        expect(result.follow).toBe(false);
+    });
+
+    it("should assume index true and follow true when no meta tag is present", async () => {
+        const html = "<html><head><title>No meta robots</title></head><body></body></html>";
+        const result = await checkPageIndexFollow(html);
+        expect(result.index).toBe(true);
+        expect(result.follow).toBe(true);
+    });
+
+    it("should work with URL content", async () => {
+        const html = "<html><head><meta name=\"robots\" content=\"noindex, follow\"></head><body></body></html>";
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() =>
+            Promise.resolve(createFakeResponse(html))
+        );
+        const result = await checkPageIndexFollow("http://example-indexfollow.com");
+        expect(result.index).toBe(false);
+        expect(result.follow).toBe(true);
+        fetchMock.mockRestore();
+    });
+
+    it("should return error on fetch failure", async () => {
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() =>
+            Promise.resolve(createFakeResponse("", { status: 500, statusText: "Internal Server Error" }))
+        );
+        const result = await checkPageIndexFollow("http://example-indexfollow.com");
+        expect(result.error).toContain("HTTP Error");
+        fetchMock.mockRestore();
+    });
 });

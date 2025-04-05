@@ -1,151 +1,153 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { checkBrandRanking, checkDomainIndexing, checkFavicon, checkRobotsForSitemap, getIndexedTestSubdomains } from "../indexing";
-import * as serperDev from "../libs/serper-dev";
+import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
+import { checkSiteSERPAppearance, checkHomepageRanking, checkFaviconAppearance, checkTestSubdomainIndexation } from "../indexing";
 
-describe("Indexing Test Functions", () => {
-  beforeEach(() => {
-    vi.restoreAllMocks();
-  });
+function createFakeResponse(body: string, init?: ResponseInit): Response {
+    return new Response(body, init);
+}
 
-  describe("checkDomainIndexing (3)", () => {
-    it("deve retornar isIndexed true quando encontrar resultados", async () => {
-      const mockSearchResult = {
-        organic: [
-          {
-            title: "Made2Web",
-            link: "https://www.made2web.com",
-            snippet: "Descrição da página",
-            position: 1,
-          },
-        ],
-      };
-      vi.spyOn(serperDev, "searchSerper").mockResolvedValueOnce(
-        mockSearchResult,
-      );
-
-      const result = await checkDomainIndexing("made2web.com");
-      expect(result).toEqual({
-        isIndexed: true,
-        totalResults: 1,
-      });
+describe("checkSiteSERPAppearance (3)", () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
     });
 
-    it("deve retornar isIndexed false quando não encontrar resultados", async () => {
-      const mockSearchResult = {
-        organic: [],
-      };
-      vi.spyOn(serperDev, "searchSerper").mockResolvedValueOnce(
-        mockSearchResult,
-      );
-
-      const result = await checkDomainIndexing("site-nao-existe.com");
-      expect(result).toEqual({
-        isIndexed: false,
-        totalResults: 0,
-      });
-    });
-  });
-
-  describe("checkBrandRanking (4)", () => {
-    it("deve identificar quando o site está em primeiro lugar", async () => {
-      const mockSearchResult = {
-        organic: [
-          {
-            title: "Made2Web Digital",
-            link: "https://made2web.com",
-            snippet: "Site da Made2Web",
-            position: 1,
-          },
-        ],
-      };
-      vi.spyOn(serperDev, "searchSerper").mockResolvedValueOnce(
-        mockSearchResult,
-      );
-
-      const result = await checkBrandRanking(
-        "made2web.com",
-        "Made2Web Digital",
-      );
-      expect(result).toEqual({
-        isRankingFirst: true,
-        position: 1,
-        topResult: {
-          link: "https://made2web.com",
-        },
-      });
-    });
-  });
-
-  describe("checkFavicon (6)", () => {
-    it("should return isFaviconPresent true when favicon is present", async () => {
-      global.fetch = vi.fn().mockResolvedValueOnce({ ok: true });
-
-      const result = await checkFavicon("made2web.com");
-      expect(result.isFaviconPresent).toBe(true);
+    it("should return isIndexed true when site appears in SERP", async () => {
+        const htmlContent = "<html><body>Some search results content without no index message.</body></html>";
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() => 
+            Promise.resolve(createFakeResponse(htmlContent, { status: 200 })) as Promise<Response>
+        );
+        const result = await checkSiteSERPAppearance("https://example.com");
+        expect(result.isIndexed).toBe(true);
+        expect(result.resultSummary).toBe("Site appears to be indexed in Google SERP.");
+        fetchMock.mockRestore();
     });
 
-    it("should return isFaviconPresent false when favicon is not present", async () => {
-      global.fetch = vi.fn().mockResolvedValueOnce({ ok: false });
-
-      const result = await checkFavicon("made2web.com");
-      expect(result.isFaviconPresent).toBe(false);
-    });
-  });
-
-  describe("checkRobotsForSitemap (11)", () => {
-    it("should return mentionsSitemap true when robots.txt mentions sitemap.xml", async () => {
-      const mockRobotsContent = "User-agent: *\nDisallow: /\nSitemap: https://made2web.com/sitemap.xml";
-      global.fetch = vi.fn().mockResolvedValueOnce({
-        ok: true,
-        text: vi.fn().mockResolvedValueOnce(mockRobotsContent),
-      });
-
-      const result = await checkRobotsForSitemap("made2web.com");
-      expect(result).toEqual({
-        mentionsSitemap: true,
-      });
+    it("should return isIndexed false when site is not indexed", async () => {
+        const htmlContent = "<html><body>Your search - site:example.com - did not match any documents.</body></html>";
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() => 
+            Promise.resolve(createFakeResponse(htmlContent, { status: 200 })) as Promise<Response>
+        );
+        const result = await checkSiteSERPAppearance("https://example.com");
+        expect(result.isIndexed).toBe(false);
+        expect(result.resultSummary).toBe("Site not indexed in Google SERP.");
+        fetchMock.mockRestore();
     });
 
-    it("should return mentionsSitemap false when robots.txt does not mention sitemap.xml", async () => {
-      const mockRobotsContent = "User-agent: *\nDisallow: /";
-      global.fetch = vi.fn().mockResolvedValueOnce({
-        ok: true,
-        text: vi.fn().mockResolvedValueOnce(mockRobotsContent),
-      });
-
-      const result = await checkRobotsForSitemap("made2web.com");
-      expect(result).toEqual({
-        mentionsSitemap: false,
-      });
+    it("should handle fetch error gracefully", async () => {
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() => 
+            Promise.reject(new Error("Network error"))
+        );
+        const result = await checkSiteSERPAppearance("https://example.com");
+        expect(result.isIndexed).toBe(false);
+        expect(result.error).toBe("Network error");
+        fetchMock.mockRestore();
     });
-  });
+});
 
-  describe("getIndexedTestSubdomains (5)", () => {
-    it("should return indexed test subdomains", async () => {
-      vi.spyOn(serperDev, "searchSerper").mockImplementation(async ({ q }) => {
-        const testSubdomains = ['test', 'staging', 'dev'];
-        if (q === `site:test.made2web.com`) {
-          return {
-            organic: [
-              {
-                title: "Test Subdomain",
-                link: "https://test.made2web.com",
-                snippet: "",
-                position: 1,
-              },
-            ],
-          };
-        }
-        if (q === `site:staging.made2web.com`) {
-          return { organic: [] };
-        }
-        if (q === `site:dev.made2web.com`) {
-          return { organic: [] };
-        }
-        return { organic: [] };
-      });
-      const result = await getIndexedTestSubdomains("made2web.com");
-      expect(result).toEqual(["test.made2web.com"]);
+describe("checkHomepageRanking (4)", () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
     });
-  });
+
+    it("should return isRankedFirst true when homepage is the first link in search results", async () => {
+        const htmlContent = '<html><body>' +
+            '<a href=\"https://example.com\">Home</a>' +
+            '<a href=\"https://example.com/about\">About</a>' +
+            '</body></html>';
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() => 
+            Promise.resolve(createFakeResponse(htmlContent, { status: 200 })) as Promise<Response>
+        );
+        const result = await checkHomepageRanking("https://example.com");
+        expect(result.isRankedFirst).toBe(true);
+        expect(result.resultSummary).toBe("Homepage is ranked first for the brand search.");
+        fetchMock.mockRestore();
+    });
+
+    it("should return isRankedFirst false when homepage is not the first domain link in search results", async () => {
+        const htmlContent = '<html><body>' +
+            '<a href=\"https://notexample.com\">Other</a>' +
+            '<a href=\"https://example.com\">Home</a>' +
+            '</body></html>';
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() => 
+            Promise.resolve(createFakeResponse(htmlContent, { status: 200 })) as Promise<Response>
+        );
+        const result = await checkHomepageRanking("https://example.com");
+        expect(result.isRankedFirst).toBe(false);
+        expect(result.resultSummary).toBe("Homepage is not ranked first for the brand search.");
+        fetchMock.mockRestore();
+    });
+
+    it("should handle fetch error gracefully in homepage ranking check", async () => {
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() => 
+            Promise.reject(new Error("Network error"))
+        );
+        const result = await checkHomepageRanking("https://example.com");
+        expect(result.isRankedFirst).toBe(false);
+        expect(result.error).toBe("Network error");
+        fetchMock.mockRestore();
+    });
+});
+
+describe("checkFaviconAppearance (6)", () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    it("should return isFaviconPresent true when favicon tag is present in HTML content", async () => {
+        const htmlContent = "<html><head><link rel=\"icon\" href=\"/favicon.ico\"></head><body>Content</body></html>";
+        const result = await checkFaviconAppearance(htmlContent);
+        expect(result.isFaviconPresent).toBe(true);
+        expect(result.resultSummary).toBe("Favicon is present.");
+    });
+
+    it("should return isFaviconPresent false when favicon tag is missing in HTML content", async () => {
+        const htmlContent = "<html><head></head><body>Content</body></html>";
+        const result = await checkFaviconAppearance(htmlContent);
+        expect(result.isFaviconPresent).toBe(false);
+        expect(result.resultSummary).toBe("Favicon is not present.");
+    });
+
+    it("should return isFaviconPresent true for URL input when favicon tag is present", async () => {
+        const htmlContent = "<html><head><link rel=\"shortcut icon\" href=\"/favicon.ico\"></head><body>Content</body></html>";
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() => 
+            Promise.resolve(createFakeResponse(htmlContent, { status: 200 })) as Promise<Response>
+        );
+        const result = await checkFaviconAppearance("https://example.com");
+        expect(result.isFaviconPresent).toBe(true);
+        expect(result.resultSummary).toBe("Favicon is present.");
+        fetchMock.mockRestore();
+    });
+
+    it("should handle fetch error gracefully for URL input in favicon check", async () => {
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() => 
+            Promise.reject(new Error("Network error"))
+        );
+        const result = await checkFaviconAppearance("https://example.com");
+        expect(result.isFaviconPresent).toBe(false);
+        expect(result.error).toBe("Network error");
+        fetchMock.mockRestore();
+    });
+});
+
+describe("checkTestSubdomainIndexation (5)", () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+    
+    it("should return isTestSubdomain true for test environment subdomain", async () => {
+        const result = await checkTestSubdomainIndexation("https://staging.example.com");
+        expect(result.isTestSubdomain).toBe(true);
+        expect(result.recommendation).toBe("Test environment subdomain should not be indexed.");
+    });
+    
+    it("should return isTestSubdomain false for production domain", async () => {
+        const result = await checkTestSubdomainIndexation("https://example.com");
+        expect(result.isTestSubdomain).toBe(false);
+        expect(result.recommendation).toBe("Subdomain seems to be production-ready.");
+    });
+    
+    it("should return error for invalid URL input", async () => {
+        const result = await checkTestSubdomainIndexation("not-a-url");
+        expect(result.isTestSubdomain).toBe(false);
+        expect(result.recommendation).toBe("Input provided is not a valid URL.");
+    });
 });
