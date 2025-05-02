@@ -46,3 +46,10 @@ export function isHtmlContent(input: string): [boolean, string] {
     ? [true, trimmed.slice(trimmed.indexOf('>') + 1, trimmed.lastIndexOf(closingTag))]
     : [false, ""];
 }
+
+export function appendURLSegment(url: string, segment: string): string {
+  if (url.endsWith('/')) {
+    url = url.slice(0, -1);
+  }
+  return `${url}/${segment}`;
+}
